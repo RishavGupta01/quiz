@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Couples Quiz Game</title>
+    <!-- 
+        This meta tag is a Content Security Policy (CSP). 
+        It is required because GitHub Pages has a very strict default CSP that blocks Firebase functions.
+        This policy allows scripts from trusted sources (Firebase, Tailwind, Lucide) and enables 
+        the necessary connections for the database to function correctly.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://www.gstatic.com https://unpkg.com 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self' https://firestore.googleapis.com https://securetoken.googleapis.com;">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -56,15 +63,39 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
+        // --- IMPORTANT: Paste your Firebase config here when hosting locally or on GitHub Pages ---
+        // You can find this in your Firebase project settings
+        const userFirebaseConfig = {
+          apiKey: "AIzaSyAkb405RDB01AI8RY6adXO1hWFVKDjkWxY",
+          authDomain: "quiz-17b84.firebaseapp.com",
+          projectId: "quiz-17b84",
+          storageBucket: "quiz-17b84.firebasestorage.app",
+          messagingSenderId: "468855544833",
+          appId: "1:468855544833:web:1063ec20cbedcce6283400"
+        };
+        
+        // Use the Canvas-provided config if available, otherwise use the user-provided config
+        const finalFirebaseConfig = Object.keys(firebaseConfig).length > 0 ? firebaseConfig : userFirebaseConfig;
+
         // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
+        let app, db, auth;
+        try {
+            if (!finalFirebaseConfig || !finalFirebaseConfig.projectId) {
+                throw new Error("Firebase configuration is missing or incomplete.");
+            }
+            app = initializeApp(finalFirebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+        } catch (e) {
+            console.error('Firebase Initialization Error:', e);
+            document.getElementById('game-container').innerHTML = `<div class="text-red-500 dark:text-red-400 text-center p-4">Firebase initialization failed. Please check your configuration.</div>`;
+            throw e;
+        }
+
         let user = null;
         let gameId = '';
         let game = null;
         let playerName = '';
-        let gameMode = null;
         let currentInput = '';
         let loading = false;
         let error = '';
@@ -146,20 +177,8 @@
                         <label for="playerName" class="block text-gray-700 dark:text-gray-300 text-lg mb-2">Your Name:</label>
                         <input id="playerName" type="text" placeholder="Enter your name" class="w-full max-w-sm mx-auto px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-electric-blue dark:focus:ring-neon-pink" required />
                     </div>
-                    <h2 class="text-xl sm:text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Choose a Game Mode</h2>
-                    <div class="space-y-4 max-w-sm mx-auto">
-                        <button id="standard-mode" class="w-full flex items-center justify-center px-6 py-4 rounded-xl transition-colors bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600">
-                            <i data-lucide="message-circle-question" class="mr-2"></i> Standard Quiz
-                        </button>
-                        <button id="quickfire-mode" class="w-full flex items-center justify-center px-6 py-4 rounded-xl transition-colors bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600">
-                            <i data-lucide="timer" class="mr-2"></i> Quick Fire
-                        </button>
-                        <button id="storytime-mode" class="w-full flex items-center justify-center px-6 py-4 rounded-xl transition-colors bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600">
-                            <i data-lucide="file-text" class="mr-2"></i> Story Time
-                        </button>
-                    </div>
                     <div class="mt-8 space-y-4">
-                        <button id="create-game" class="w-full max-w-sm mx-auto flex items-center justify-center px-6 py-3 bg-neon-pink text-white rounded-lg shadow-lg hover:bg-neon-pink-darker transition-colors disabled:opacity-50" disabled>
+                        <button id="create-game" class="w-full max-w-sm mx-auto flex items-center justify-center px-6 py-3 bg-neon-pink text-white rounded-lg shadow-lg hover:bg-neon-pink-darker transition-colors disabled:opacity-50">
                             <i data-lucide="sparkles" class="mr-2"></i> Create New Game
                         </button>
                         <div class="flex items-center">
@@ -170,7 +189,7 @@
                         <div class="w-full max-w-sm mx-auto">
                             <label for="joinGameId" class="block text-gray-700 dark:text-gray-300 text-lg mb-2">Join a Game:</label>
                             <input id="joinGameId" type="text" placeholder="Enter Game Code" class="w-full px-4 py-3 border rounded-lg mb-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-neon-pink dark:focus:ring-electric-blue" required />
-                            <button id="join-game" class="w-full flex items-center justify-center px-6 py-3 bg-electric-blue text-white rounded-lg shadow-lg hover:bg-electric-blue-darker transition-colors disabled:opacity-50" disabled>
+                            <button id="join-game" class="w-full flex items-center justify-center px-6 py-3 bg-electric-blue text-white rounded-lg shadow-lg hover:bg-electric-blue-darker transition-colors disabled:opacity-50">
                                 <i data-lucide="users" class="mr-2"></i> Join Game
                             </button>
                         </div>
@@ -182,15 +201,16 @@
             const joinGameIdInput = document.getElementById('joinGameId');
             const createBtn = document.getElementById('create-game');
             const joinBtn = document.getElementById('join-game');
-            const modeButtons = document.querySelectorAll('button[id$="-mode"]');
 
             const updateButtonStates = () => {
                 const nameValid = playerNameInput.value.trim() !== '';
-                const gameModeSelected = gameMode !== null;
                 const gameIdValid = joinGameIdInput.value.trim() !== '';
-                createBtn.disabled = !(nameValid && gameModeSelected);
+                createBtn.disabled = !nameValid;
                 joinBtn.disabled = !(nameValid && gameIdValid);
             };
+
+            // Initial state update
+            updateButtonStates();
 
             playerNameInput.addEventListener('input', (e) => {
                 playerName = e.target.value;
@@ -199,19 +219,6 @@
             joinGameIdInput.addEventListener('input', (e) => {
                 gameId = e.target.value;
                 updateButtonStates();
-            });
-
-            modeButtons.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    modeButtons.forEach(b => {
-                        b.classList.remove('bg-electric-blue', 'dark:bg-neon-pink', 'text-white', 'shadow-lg');
-                        b.classList.add('bg-gray-200', 'dark:bg-gray-700', 'text-gray-800', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
-                    });
-                    btn.classList.add('bg-electric-blue', 'dark:bg-neon-pink', 'text-white', 'shadow-lg');
-                    btn.classList.remove('bg-gray-200', 'dark:bg-gray-700', 'text-gray-800', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
-                    gameMode = btn.id.replace('-mode', '');
-                    updateButtonStates();
-                });
             });
 
             createBtn.addEventListener('click', createGame);
@@ -251,162 +258,69 @@
         function renderPlaying() {
             const currentPlayer = game.players.find(p => p.id === user.uid);
             const opponentPlayer = game.players.find(p => p.id !== user.uid);
-            const question = game.questions[game.currentQuestionIndex];
             const isPlayer1 = game.players[0].id === user.uid;
-            const playerAnswered = isPlayer1 ? question.player1Answer : question.player2Answer;
-            const opponentAnswered = isPlayer1 ? question.player2Answer : question.player1Answer;
-            
+            const questionIndex = game.currentQuestionIndex;
+            const playerAnswered = game.questions[questionIndex].player1Answer && game.questions[questionIndex].player2Answer;
+
             let mainContent = '';
 
-            if (game.mode === 'standard') {
-                const isPlayerTurnToAnswer = game.currentTurnPlayerId === user.uid && !playerAnswered && !opponentAnswered;
-                const isPlayerTurnToGuess = game.currentTurnPlayerId === user.uid && opponentAnswered && !playerAnswered;
-                const waitingForPartner = game.currentTurnPlayerId !== user.uid;
+            if (game.currentTurnPlayerId === user.uid && !game.questions[questionIndex].player1Answer) {
+                // This player is providing the question
+                mainContent = `
+                    <div class="text-center p-8">
+                        <h3 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Your Turn, ${currentPlayer.name}!</h3>
+                        <p class="text-lg mb-6 text-gray-600 dark:text-gray-400">Ask your partner a question about your relationship. Then enter their answer below:</p>
+                        <textarea id="input-field" placeholder="Enter their answer here..." class="w-full h-32 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-electric-blue dark:focus:ring-neon-pink"></textarea>
+                        <button id="submit-btn" class="w-full px-6 py-3 mt-4 bg-neon-pink text-white rounded-lg shadow-lg hover:bg-neon-pink-darker transition-colors disabled:opacity-50">
+                            Submit Answer
+                        </button>
+                    </div>
+                `;
+            } else if (game.currentTurnPlayerId !== user.uid) {
+                // This player is waiting for their partner to ask a question
+                mainContent = `
+                    <div class="text-center p-8">
+                        <h3 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Waiting for ${opponentPlayer.name}...</h3>
+                        <p class="text-lg text-gray-600 dark:text-gray-400">Your partner is thinking of a question for you now.</p>
+                        <div class="animate-pulse mt-8">
+                            <i data-lucide="sparkles" class="w-12 h-12 mx-auto text-neon-pink dark:text-electric-blue"></i>
+                        </div>
+                    </div>
+                `;
+            } else if (game.currentTurnPlayerId === user.uid && game.questions[questionIndex].player1Answer && !game.questions[questionIndex].player2Answer) {
+                // This player needs to guess the answer
+                const opponentAnswer = isPlayer1 ? game.questions[questionIndex].player2Answer : game.questions[questionIndex].player1Answer;
+                 mainContent = `
+                    <div class="text-center p-8">
+                        <h3 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Your Guess, ${currentPlayer.name}!</h3>
+                        <p class="text-lg mb-6 text-gray-600 dark:text-gray-400">What do you think their answer was?</p>
+                        <textarea id="input-field" placeholder="Enter your guess here..." class="w-full h-32 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-electric-blue dark:focus:ring-neon-pink"></textarea>
+                        <button id="submit-btn" class="w-full px-6 py-3 mt-4 bg-electric-blue text-white rounded-lg shadow-lg hover:bg-electric-blue-darker transition-colors disabled:opacity-50">
+                            Submit Guess
+                        </button>
+                        ${feedback === 'correct' ? `
+                            <div class="mt-4 text-green-500 font-bold text-xl flex items-center justify-center animate-bounce">
+                                <i data-lucide="check" class="mr-2"></i> Correct! +1 Point
+                            </div>
+                        ` : ''}
+                        ${feedback === 'incorrect' ? `
+                            <div class="mt-4 text-red-500 font-bold text-xl flex items-center justify-center animate-shake">
+                                <i data-lucide="x" class="mr-2"></i> Incorrect.
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
 
-                if (isPlayerTurnToAnswer) {
-                    mainContent = `
-                        <div class="text-center p-8">
-                            <h3 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Your Turn, ${currentPlayer.name}!</h3>
-                            <p class="text-lg mb-6 text-gray-600 dark:text-gray-400">Complete the sentence for your partner to guess:</p>
-                            <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg mb-4 shadow-inner">
-                                <p class="text-xl font-semibold text-gray-800 dark:text-gray-200">${question.question.replace('___', '______')}</p>
-                            </div>
-                            <input id="input-field" type="text" placeholder="Enter the answer here..." class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-electric-blue dark:focus:ring-neon-pink" />
-                            <button id="submit-btn" class="w-full px-6 py-3 bg-neon-pink text-white rounded-lg shadow-lg hover:bg-neon-pink-darker transition-colors disabled:opacity-50">
-                                Submit Answer
-                            </button>
+            } else {
+                 mainContent = `
+                    <div class="text-center p-8">
+                        <h3 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Waiting for ${opponentPlayer.name}...</h3>
+                        <p class="text-lg text-gray-600 dark:text-gray-400">Your partner is guessing your answer now.</p>
+                        <div class="animate-pulse mt-8">
+                            <i data-lucide="sparkles" class="w-12 h-12 mx-auto text-neon-pink dark:text-electric-blue"></i>
                         </div>
-                    `;
-                } else if (isPlayerTurnToGuess) {
-                    mainContent = `
-                        <div class="text-center p-8">
-                            <h3 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Your Guess, ${currentPlayer.name}!</h3>
-                            <p class="text-lg mb-6 text-gray-600 dark:text-gray-400">Guess what your partner said for this sentence:</p>
-                            <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg mb-4 shadow-inner">
-                                <p class="text-xl font-semibold text-gray-800 dark:text-gray-200">${question.question.replace('___', '______')}</p>
-                            </div>
-                            <input id="input-field" type="text" placeholder="Enter your guess here..." class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-neon-pink dark:focus:ring-electric-blue" />
-                            <button id="submit-btn" class="w-full px-6 py-3 bg-electric-blue text-white rounded-lg shadow-lg hover:bg-electric-blue-darker transition-colors disabled:opacity-50">
-                                Submit Guess
-                            </button>
-                            ${feedback === 'correct' ? `
-                                <div class="mt-4 text-green-500 font-bold text-xl flex items-center justify-center animate-bounce">
-                                    <i data-lucide="check" class="mr-2"></i> Correct! +1 Point
-                                </div>
-                            ` : ''}
-                            ${feedback === 'incorrect' ? `
-                                <div class="mt-4 text-red-500 font-bold text-xl flex items-center justify-center animate-shake">
-                                    <i data-lucide="x" class="mr-2"></i> Incorrect.
-                                </div>
-                            ` : ''}
-                        </div>
-                    `;
-                } else if (waitingForPartner) {
-                    mainContent = `
-                        <div class="text-center p-8">
-                            <h3 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Waiting for ${opponentPlayer.name}...</h3>
-                            <p class="text-lg text-gray-600 dark:text-gray-400">${opponentPlayer.name} is currently answering or guessing.</p>
-                            <div class="animate-pulse mt-8">
-                                <i data-lucide="sparkles" class="w-12 h-12 mx-auto text-neon-pink dark:text-electric-blue"></i>
-                            </div>
-                        </div>
-                    `;
-                }
-            } else if (game.mode === 'quickFire') {
-                const allAnswered = question.player1Answer && question.player2Answer;
-                const myAnswered = isPlayer1 ? question.player1Answer : question.player2Answer;
-
-                if (allAnswered) {
-                    const p1Correct = question.player1Correct;
-                    const p2Correct = question.player2Correct;
-                    const myCorrect = isPlayer1 ? p1Correct : p2Correct;
-                    const opponentCorrect = isPlayer1 ? p2Correct : p1Correct;
-                    mainContent = `
-                        <div class="text-center p-8">
-                            <h3 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Round Complete!</h3>
-                            <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg mb-4 shadow-inner">
-                                <p class="text-xl font-semibold text-gray-800 dark:text-gray-200">${question.question.replace('___', '______')}</p>
-                                <p class="mt-2 text-lg text-gray-700 dark:text-gray-300">Correct Answer: <span class="font-bold text-electric-blue dark:text-neon-pink">${question.answer}</span></p>
-                            </div>
-                            <div class="mt-4 p-4 rounded-lg shadow-md ${myCorrect ? 'bg-green-100 dark:bg-green-700 text-green-700 dark:text-green-200' : 'bg-red-100 dark:bg-red-700 text-red-700 dark:text-red-200'}">
-                                <p class="font-semibold">${currentPlayer.name}'s guess: ${isPlayer1 ? question.player1Answer : question.player2Answer}</p>
-                                <p class="text-sm font-bold">${myCorrect ? 'Correct!' : 'Incorrect.'}</p>
-                            </div>
-                            <div class="mt-4 p-4 rounded-lg shadow-md ${opponentCorrect ? 'bg-green-100 dark:bg-green-700 text-green-700 dark:text-green-200' : 'bg-red-100 dark:bg-red-700 text-red-700 dark:text-red-200'}">
-                                <p class="font-semibold">${opponentPlayer.name}'s guess: ${isPlayer1 ? question.player2Answer : question.player1Answer}</p>
-                                <p class="text-sm font-bold">${opponentCorrect ? 'Correct!' : 'Incorrect.'}</p>
-                            </div>
-                            <div class="animate-pulse mt-8">
-                                <i data-lucide="sparkles" class="w-12 h-12 mx-auto text-neon-pink dark:text-electric-blue"></i>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    mainContent = `
-                        <div class="text-center p-8">
-                            <h3 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Quick Fire!</h3>
-                            <p class="text-lg mb-6 text-gray-600 dark:text-gray-400">First to guess wins the point!</p>
-                            <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg mb-4 shadow-inner">
-                                <p class="text-xl font-semibold text-gray-800 dark:text-gray-200">${question.question.replace('___', '______')}</p>
-                            </div>
-                            ${!myAnswered ? `
-                                <input id="input-field" type="text" placeholder="Type your guess here..." class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-electric-blue dark:focus:ring-neon-pink" />
-                                <button id="submit-btn" class="w-full px-6 py-3 bg-neon-pink text-white rounded-lg shadow-lg hover:bg-neon-pink-darker transition-colors disabled:opacity-50">
-                                    Submit Guess
-                                </button>
-                            ` : `
-                                <div class="mt-4 text-lg text-gray-600 dark:text-gray-400">
-                                    You've submitted your guess. Waiting for ${opponentPlayer.name}...
-                                </div>
-                            `}
-                        </div>
-                    `;
-                }
-            } else if (game.mode === 'storyTime') {
-                const allAnswered = question.player1Answer && question.player2Answer;
-                const myAnswered = isPlayer1 ? question.player1Answer : question.player2Answer;
-
-                if (allAnswered) {
-                    mainContent = `
-                        <div class="text-center p-8">
-                            <h3 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Round Complete!</h3>
-                            <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg mb-4 shadow-inner">
-                                <p class="text-xl font-semibold text-gray-800 dark:text-gray-200">${question.question}</p>
-                            </div>
-                            <div class="mt-4 p-4 bg-purple-100 dark:bg-purple-900 rounded-lg shadow-md">
-                                <p class="font-semibold text-purple-700 dark:text-purple-300">${currentPlayer.name}'s Story:</p>
-                                <p class="mt-2 text-gray-700 dark:text-gray-300">${isPlayer1 ? question.player1Answer : question.player2Answer}</p>
-                            </div>
-                            <div class="mt-4 p-4 bg-pink-100 dark:bg-pink-900 rounded-lg shadow-md">
-                                <p class="font-semibold text-pink-700 dark:text-pink-300">${opponentPlayer.name}'s Story:</p>
-                                <p class="mt-2 text-gray-700 dark:text-gray-300">${isPlayer1 ? question.player2Answer : question.player1Answer}</p>
-                            </div>
-                            <div class="animate-pulse mt-8">
-                                <i data-lucide="sparkles" class="w-12 h-12 mx-auto text-neon-pink dark:text-electric-blue"></i>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    mainContent = `
-                        <div class="text-center p-8">
-                            <h3 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Story Time!</h3>
-                            <p class="text-lg mb-6 text-gray-600 dark:text-gray-400">Share your story below.</p>
-                            <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg mb-4 shadow-inner">
-                                <p class="text-xl font-semibold text-gray-800 dark:text-gray-200">${question.question}</p>
-                            </div>
-                            ${!myAnswered ? `
-                                <textarea id="input-field" placeholder="Type your story here..." class="w-full h-32 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-electric-blue dark:focus:ring-neon-pink"></textarea>
-                                <button id="submit-btn" class="w-full px-6 py-3 bg-neon-pink text-white rounded-lg shadow-lg hover:bg-neon-pink-darker transition-colors disabled:opacity-50">
-                                    Share Story
-                                </button>
-                            ` : `
-                                <div class="mt-4 text-lg text-gray-600 dark:text-gray-400">
-                                    You've shared your story. Waiting for ${opponentPlayer.name}...
-                                </div>
-                            `}
-                        </div>
-                    `;
-                }
+                    </div>
+                `;
             }
 
             container.innerHTML = `
@@ -415,7 +329,7 @@
                         <div class="text-lg font-semibold text-electric-blue dark:text-neon-pink">
                             ${game.players[0].name}: ${game.players[0].score}
                         </div>
-                        <div class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase">${game.mode}</div>
+                        <div class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase">Couples Quiz</div>
                         <div class="text-lg font-semibold text-neon-pink dark:text-electric-blue">
                             ${game.players.length > 1 ? game.players[1].name : 'Waiting...'}: ${game.players.length > 1 ? game.players[1].score : 0}
                         </div>
@@ -433,17 +347,11 @@
                 inputField.addEventListener('input', () => {
                     submitBtn.disabled = !inputField.value.trim();
                 });
-                if (game.mode === 'standard') {
-                    const isPlayerTurnToGuess = game.currentTurnPlayerId === user.uid && opponentAnswered && !playerAnswered;
-                    if (isPlayerTurnToGuess) {
-                        submitBtn.addEventListener('click', handleStandardGuess);
-                    } else {
-                        submitBtn.addEventListener('click', handleStandardAnswer);
-                    }
-                } else if (game.mode === 'quickFire') {
-                    submitBtn.addEventListener('click', handleQuickFireSubmit);
-                } else if (game.mode === 'storyTime') {
-                    submitBtn.addEventListener('click', handleStoryTimeSubmit);
+                
+                if (game.currentTurnPlayerId === user.uid && !game.questions[questionIndex].player1Answer) {
+                    submitBtn.addEventListener('click', handleAnswer);
+                } else if (game.currentTurnPlayerId === user.uid && game.questions[questionIndex].player1Answer && !game.questions[questionIndex].player2Answer) {
+                    submitBtn.addEventListener('click', handleGuess);
                 }
             }
         }
@@ -475,84 +383,12 @@
             document.getElementById('play-again').addEventListener('click', () => window.location.reload());
         }
 
-        // --- Core game logic functions (same as React version) ---
-        async function getQuestionsFromLLM(mode) {
-            let prompt;
-            if (mode === 'storyTime') {
-                prompt = `Generate 5 fun, open-ended conversation starters for a couple. The questions should encourage detailed, personal stories, not one-word answers. Respond with an array of JSON objects.
-                    Example questions:
-                    "Describe your most memorable date together."
-                    "What's a future adventure you'd love to go on as a couple?"
-                    "Share a story about a time your partner made you laugh the hardest."`
-            } else {
-                prompt = `Generate 5 fun, light-hearted "fill-in-the-blank" questions for a couples quiz game. The questions should have a distinct, simple answer. For each question, provide an example of a potential answer. Respond with an array of JSON objects.
-                    Example questions:
-                    "My partner's favorite movie is ___."
-                    "The first place we traveled to together was ___."
-                    "The most embarrassing thing my partner has ever done is ___."
-                    "My partner's favorite food is ___."
-                    "The best gift I ever gave my partner was ___."`
-            }
-            let chatHistory = [];
-            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
-            const payload = {
-                contents: chatHistory,
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: "ARRAY",
-                        items: {
-                            type: "OBJECT",
-                            properties: {
-                                "question": { "type": "STRING" },
-                                "answer": { "type": "STRING" }
-                            },
-                            "propertyOrdering": ["question", "answer"]
-                        }
-                    }
-                }
-            };
-            const makeRequest = async (retries = 3, delay = 1000) => {
-                try {
-                    const apiKey = "";
-                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (!response.ok) {
-                        if (response.status === 429 && retries > 0) {
-                            await new Promise(res => setTimeout(res, delay));
-                            return makeRequest(retries - 1, delay * 2);
-                        }
-                        throw new Error(`API call failed with status: ${response.status}`);
-                    }
-                    const result = await response.json();
-                    const json = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (json) {
-                        return JSON.parse(json);
-                    } else {
-                        throw new Error('No content received from API.');
-                    }
-                } catch (err) {
-                    console.error('LLM API call error:', err);
-                    return null;
-                }
-            };
-            return makeRequest();
-        }
+        // --- Core game logic functions ---
 
         async function createGame() {
-            // Log to see if the function is called and with what data
-            console.log("Attempting to create a game...");
-            console.log("Player Name:", playerName);
-            console.log("Game Mode:", gameMode);
-            
-            if (!gameMode || !playerName.trim()) {
-                const errorMessage = 'Please select a mode and enter your name.';
+            if (!playerName.trim()) {
+                const errorMessage = 'Please enter your name.';
                 setError(errorMessage);
-                console.error("Create Game Error:", errorMessage);
                 render();
                 return;
             }
@@ -560,27 +396,17 @@
             try {
                 const newGameDocRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'games'));
                 const newGameId = newGameDocRef.id;
-                console.log("Generating questions via LLM...");
-                const questions = await getQuestionsFromLLM(gameMode);
-                if (!questions) {
-                    const errorMessage = 'Failed to generate questions. Please try again.';
-                    setError(errorMessage);
-                    console.error("Create Game Error:", errorMessage);
-                    setLoadingState(false);
-                    return;
-                }
+                
                 const initialGame = {
                     players: [{ id: user.uid, name: playerName, score: 0 }],
                     currentQuestionIndex: 0,
                     status: 'waiting',
                     currentTurnPlayerId: user.uid,
-                    questions: questions.map(q => ({ ...q, player1Answer: null, player2Answer: null })),
-                    mode: gameMode,
+                    questions: [{player1Answer: null, player2Answer: null}],
+                    mode: 'couples-quiz',
                 };
-                console.log("Writing initial game data to Firestore...");
                 await setDoc(newGameDocRef, initialGame);
                 gameId = newGameId;
-                console.log("Game created successfully with ID:", gameId);
                 setLoadingState(false);
             } catch (err) {
                 console.error('Error creating game:', err);
@@ -593,7 +419,6 @@
             if (!gameId.trim() || !playerName.trim()) {
                 const errorMessage = 'Please enter a game code and your name.';
                 setError(errorMessage);
-                console.error("Join Game Error:", errorMessage);
                 render();
                 return;
             }
@@ -605,17 +430,14 @@
                     const gameData = gameDoc.data();
                     const updatedPlayers = [...gameData.players, { id: user.uid, name: playerName, score: 0 }];
                     await updateDoc(gameDocRef, { players: updatedPlayers });
-                    console.log("Joined game successfully with ID:", gameId);
                     setLoadingState(false);
                 } else if (!gameDoc.exists()) {
                     const errorMessage = 'Game not found.';
                     setError(errorMessage);
-                    console.error("Join Game Error:", errorMessage);
                     setLoadingState(false);
                 } else {
                     const errorMessage = 'Game is already full.';
                     setError(errorMessage);
-                    console.error("Join Game Error:", errorMessage);
                     setLoadingState(false);
                 }
             } catch (err) {
@@ -629,17 +451,21 @@
             const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'games', gameId);
             const nextQuestionIndex = gameData.currentQuestionIndex + 1;
             const nextTurnPlayerId = gameData.players[0].id;
-            if (nextQuestionIndex < gameData.questions.length) {
+            
+            const newQuestions = [...gameData.questions, {player1Answer: null, player2Answer: null}];
+
+            if (nextQuestionIndex < gameData.questions.length + 1) {
                 await updateDoc(gameDocRef, {
                     currentQuestionIndex: nextQuestionIndex,
                     currentTurnPlayerId: nextTurnPlayerId,
+                    questions: newQuestions,
                 });
             } else {
                 await updateDoc(gameDocRef, { status: 'finished' });
             }
         }
 
-        async function handleStandardAnswer() {
+        async function handleAnswer() {
             if (!game || !currentInput.trim()) return;
             setLoadingState(true);
             try {
@@ -647,12 +473,15 @@
                 const gameData = { ...game };
                 const player1Id = gameData.players[0].id;
                 const questionIndex = gameData.currentQuestionIndex;
+
                 if (user.uid === player1Id) {
                     gameData.questions[questionIndex].player1Answer = currentInput;
+                    gameData.currentTurnPlayerId = gameData.players[1].id;
                 } else {
                     gameData.questions[questionIndex].player2Answer = currentInput;
+                    gameData.currentTurnPlayerId = player1Id;
                 }
-                gameData.currentTurnPlayerId = (user.uid === player1Id) ? gameData.players[1].id : player1Id;
+                
                 await updateDoc(gameDocRef, { questions: gameData.questions, currentTurnPlayerId: gameData.currentTurnPlayerId });
                 currentInput = '';
                 setLoadingState(false);
@@ -663,26 +492,28 @@
             }
         }
 
-        async function handleStandardGuess() {
+        async function handleGuess() {
             if (!game || !currentInput.trim()) return;
             setLoadingState(true);
             try {
                 const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'games', gameId);
                 const gameData = { ...game };
                 const currentPlayerIndex = gameData.players.findIndex(p => p.id === user.uid);
-                const opponentPlayerIndex = 1 - currentPlayerIndex;
                 const questionIndex = gameData.currentQuestionIndex;
-                const correctAnswer = (user.uid === gameData.players[0].id) ? gameData.questions[questionIndex].player2Answer : gameData.questions[questionIndex].player1Answer;
-                const isCorrect = currentInput.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
+
+                const opponentAnswer = (user.uid === gameData.players[0].id) ? gameData.questions[questionIndex].player2Answer : gameData.questions[questionIndex].player1Answer;
+                const isCorrect = currentInput.trim().toLowerCase() === opponentAnswer.trim().toLowerCase();
+                
                 if (isCorrect) {
                     gameData.players[currentPlayerIndex].score += 1;
                     feedback = 'correct';
                 } else {
                     feedback = 'incorrect';
                 }
+
                 await updateDoc(gameDocRef, { players: gameData.players });
                 currentInput = '';
-                renderPlaying(); // Render with feedback
+                renderPlaying();
                 setTimeout(() => {
                     advanceGame(gameData);
                 }, 2000);
@@ -692,70 +523,7 @@
                 setLoadingState(false);
             }
         }
-
-        async function handleQuickFireSubmit() {
-            if (!game || !currentInput.trim()) return;
-            setLoadingState(true);
-            try {
-                const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'games', gameId);
-                const gameData = { ...game };
-                const currentPlayerIndex = gameData.players.findIndex(p => p.id === user.uid);
-                const questionIndex = gameData.currentQuestionIndex;
-                const isPlayer1 = gameData.players[0].id === user.uid;
-                if ((isPlayer1 && gameData.questions[questionIndex].player1Answer) || (!isPlayer1 && gameData.questions[questionIndex].player2Answer)) return;
-                const correctAnswer = gameData.questions[questionIndex].answer;
-                const isCorrect = currentInput.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
-                if (user.uid === gameData.players[0].id) {
-                    gameData.questions[questionIndex].player1Answer = currentInput;
-                    gameData.questions[questionIndex].player1Correct = isCorrect;
-                } else {
-                    gameData.questions[questionIndex].player2Answer = currentInput;
-                    gameData.questions[questionIndex].player2Correct = isCorrect;
-                }
-                await updateDoc(gameDocRef, { questions: gameData.questions });
-                currentInput = '';
-                if (gameData.questions[questionIndex].player1Answer && gameData.questions[questionIndex].player2Answer) {
-                    const p1Correct = gameData.questions[questionIndex].player1Correct;
-                    const p2Correct = gameData.questions[questionIndex].player2Correct;
-                    if (p1Correct && !p2Correct) gameData.players[0].score += 1;
-                    if (p2Correct && !p1Correct) gameData.players[1].score += 1;
-                    await updateDoc(gameDocRef, { players: gameData.players });
-                    setTimeout(() => { advanceGame(gameData); }, 2000);
-                }
-            } catch (err) {
-                console.error('Error submitting answer:', err);
-                setError('Failed to submit answer.');
-            } finally {
-                setLoadingState(false);
-            }
-        }
-
-        async function handleStoryTimeSubmit() {
-            if (!game || !currentInput.trim()) return;
-            setLoadingState(true);
-            try {
-                const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'games', gameId);
-                const gameData = { ...game };
-                const player1Id = gameData.players[0].id;
-                const questionIndex = gameData.currentQuestionIndex;
-                if (user.uid === player1Id) {
-                    gameData.questions[questionIndex].player1Answer = currentInput;
-                } else {
-                    gameData.questions[questionIndex].player2Answer = currentInput;
-                }
-                await updateDoc(gameDocRef, { questions: gameData.questions });
-                currentInput = '';
-                if (gameData.questions[questionIndex].player1Answer && gameData.questions[questionIndex].player2Answer) {
-                    setTimeout(() => { advanceGame(gameData); }, 2000);
-                }
-            } catch (err) {
-                console.error('Error submitting story:', err);
-                setError('Failed to submit story.');
-            } finally {
-                setLoadingState(false);
-            }
-        }
-
+        
         // --- State management functions ---
         function setLoadingState(isLoading) {
             loading = isLoading;
@@ -765,11 +533,19 @@
         // --- Event listeners and initial setup ---
         async function init() {
             loadTheme();
-            if (initialAuthToken) {
-                await signInWithCustomToken(auth, initialAuthToken);
-            } else {
+            // We'll try to sign in with a custom token. If that fails, we'll sign in anonymously.
+            // This is crucial for a real-time multiplayer game.
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error('Authentication failed, falling back to anonymous sign-in:', error);
                 await signInAnonymously(auth);
             }
+
             onAuthStateChanged(auth, (currentUser) => {
                 user = currentUser;
                 render();
