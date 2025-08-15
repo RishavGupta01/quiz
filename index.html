@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Friend's Quiz Game</title>
+    <title>Couples Quiz Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -544,8 +544,15 @@
         }
 
         async function createGame() {
+            // Log to see if the function is called and with what data
+            console.log("Attempting to create a game...");
+            console.log("Player Name:", playerName);
+            console.log("Game Mode:", gameMode);
+            
             if (!gameMode || !playerName.trim()) {
-                setError('Please select a mode and enter your name.');
+                const errorMessage = 'Please select a mode and enter your name.';
+                setError(errorMessage);
+                console.error("Create Game Error:", errorMessage);
                 render();
                 return;
             }
@@ -553,9 +560,12 @@
             try {
                 const newGameDocRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'games'));
                 const newGameId = newGameDocRef.id;
+                console.log("Generating questions via LLM...");
                 const questions = await getQuestionsFromLLM(gameMode);
                 if (!questions) {
-                    setError('Failed to generate questions. Please try again.');
+                    const errorMessage = 'Failed to generate questions. Please try again.';
+                    setError(errorMessage);
+                    console.error("Create Game Error:", errorMessage);
                     setLoadingState(false);
                     return;
                 }
@@ -567,19 +577,23 @@
                     questions: questions.map(q => ({ ...q, player1Answer: null, player2Answer: null })),
                     mode: gameMode,
                 };
+                console.log("Writing initial game data to Firestore...");
                 await setDoc(newGameDocRef, initialGame);
                 gameId = newGameId;
+                console.log("Game created successfully with ID:", gameId);
                 setLoadingState(false);
             } catch (err) {
                 console.error('Error creating game:', err);
-                setError('Failed to create game. Please try again.');
+                setError('Failed to create game. Please try again. Check console for details.');
                 setLoadingState(false);
             }
         }
 
         async function joinGame() {
             if (!gameId.trim() || !playerName.trim()) {
-                setError('Please enter a game code and your name.');
+                const errorMessage = 'Please enter a game code and your name.';
+                setError(errorMessage);
+                console.error("Join Game Error:", errorMessage);
                 render();
                 return;
             }
@@ -591,17 +605,22 @@
                     const gameData = gameDoc.data();
                     const updatedPlayers = [...gameData.players, { id: user.uid, name: playerName, score: 0 }];
                     await updateDoc(gameDocRef, { players: updatedPlayers });
+                    console.log("Joined game successfully with ID:", gameId);
                     setLoadingState(false);
                 } else if (!gameDoc.exists()) {
-                    setError('Game not found.');
+                    const errorMessage = 'Game not found.';
+                    setError(errorMessage);
+                    console.error("Join Game Error:", errorMessage);
                     setLoadingState(false);
                 } else {
-                    setError('Game is already full.');
+                    const errorMessage = 'Game is already full.';
+                    setError(errorMessage);
+                    console.error("Join Game Error:", errorMessage);
                     setLoadingState(false);
                 }
             } catch (err) {
                 console.error('Error joining game:', err);
-                setError('Failed to join game. Please try again.');
+                setError('Failed to join game. Please try again. Check console for details.');
                 setLoadingState(false);
             }
         }
